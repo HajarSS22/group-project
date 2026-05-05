@@ -82,3 +82,50 @@ export async function getBookingDetails(bookingId: number) {
     })
     return JSON.parse(JSON.stringify(booking))
 }
+
+export async function cancelBooking(bookingId: number) {
+  try {
+    const user = await getUser()
+    if (!user) {
+      return { error: 'يرجى تسجيل الدخول أولاً' }
+    }
+
+    const booking = await prisma.booking.findFirst({
+      where: { id: bookingId, userId: user.id },
+      include: { spot: true }
+    })
+
+    if (!booking) {
+      return { error: 'الحجز غير موجود أو لا ينتمي إليك' }
+    }
+
+    if (booking.status === 'cancelled') {
+      return { error: 'الحجز ملغى بالفعل' }
+    }
+
+    // Cancel booking and update spot status in a single transaction
+    await prisma.$transaction(async (tx) => {
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: { status: 'cancelled' }
+      })
+
+      // Update spot status to available
+      await tx.parkingSpot.update({
+        where: { id: booking.spotId },
+        data: { status: 'available' }
+      })
+    })
+
+    revalidatePath('/')
+    revalidatePath('/booking')
+    revalidatePath('/form')
+    revalidatePath('/dashboard')
+    revalidatePath('/ticket')
+
+    return { success: true }
+  } catch (error) {
+    console.error('Cancel booking error:', error)
+    return { error: 'حدث خطأ أثناء إلغاء الحجز' }
+  }
+}

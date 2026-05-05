@@ -1,15 +1,25 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Clock, CreditCard, MapPin, Search } from "lucide-react";
+import { Clock, CreditCard, MapPin, Search, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getUserBookings } from "@/app/actions/booking";
 import { getUserProfile } from "@/app/actions/auth";
 
+interface Booking {
+  id: number;
+  status: 'active' | 'completed' | 'cancelled';
+  spot?: { id: number; address: string };
+  createdAt: string;
+  totalPrice: number;
+  duration: number;
+}
+
 export default function DashboardPage() {
-  const [bookings, setBookings] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -22,6 +32,39 @@ export default function DashboardPage() {
     }
     fetchData();
   }, []);
+
+  const handleCancel = async (bookingId: number) => {
+    if (!window.confirm('هل أنت متأكد من رغبتك في إلغاء هذا الحجز؟')) {
+      return;
+    }
+
+    setCancellingId(bookingId);
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'فشل إلغاء الحجز');
+      }
+
+      // Update local state
+      setBookings((prevBookings) =>
+        prevBookings.map((booking) =>
+          booking.id === bookingId ? { ...booking, status: 'cancelled' } : booking
+        )
+      );
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'حدث خطأ أثناء إلغاء الحجز');
+      console.error('Cancel error:', error);
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   if (isLoading) {
     return <div className="flex-1 bg-slate-50 dark:bg-slate-950 flex items-center justify-center min-h-[50vh]">
@@ -100,6 +143,7 @@ export default function DashboardPage() {
                   <th className="px-6 py-4 font-medium">التاريخ</th>
                   <th className="px-6 py-4 font-medium">المبلغ</th>
                   <th className="px-6 py-4 font-medium">الحالة</th>
+                  <th className="px-6 py-4 font-medium">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -118,10 +162,22 @@ export default function DashboardPage() {
                         {booking.status === 'active' ? 'نشط' : booking.status === 'completed' ? 'مكتمل' : 'ملغى'}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-sm">
+                      {booking.status === 'active' && (
+                        <button
+                          onClick={() => handleCancel(booking.id)}
+                          disabled={cancellingId === booking.id}
+                          className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {cancellingId === booking.id ? 'جاري...' : 'إلغاء'}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 )) : (
                   <tr>
-                     <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
+                     <td colSpan={6} className="px-6 py-8 text-center text-sm text-slate-500">
                        لا توجد حجوزات سابقة
                      </td>
                   </tr>

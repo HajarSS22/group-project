@@ -19,7 +19,7 @@ export default function BookingFormPage() {
 
   useEffect(() => {
     getParkingSpots().then(data => {
-      const formattedSpots = data.map(s => ({
+      const formattedSpots = data.map((s: any) => ({
         id: s.id,
         location: { lat: s.lat, lng: s.lng, address: s.address },
         status: s.status as 'available' | 'booked',
@@ -56,7 +56,7 @@ export default function BookingFormPage() {
        setErrorMsg(result.error);
        setIsSubmitting(false);
        getParkingSpots().then(data => {
-         setSpots(data.map(s => ({
+         setSpots(data.map((s: any) => ({
            id: s.id, location: { lat: s.lat, lng: s.lng, address: s.address },
            status: s.status as 'available' | 'booked', price: s.price,
          })));
